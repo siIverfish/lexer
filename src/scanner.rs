@@ -18,6 +18,9 @@ pub fn scan(input: &[char]) -> Result<Vec<Lexeme>, Box<dyn std::error::Error>> {
     let mut tokens: Vec<Lexeme> = Vec::with_capacity(input.len() / 2);
 
     while let Some(&next_char) = input.get(i) {
+        // considered factoring out `i += 1;` but it makes the
+        // cool number bit so much cleaner :p
+
         let next_tk: Lexeme = match next_char {
             '+' => { i += 1; Lexeme::Token(*ADDITION      )},
             '-' => { i += 1; Lexeme::Token(*SUBTRACTION   )},
@@ -27,6 +30,8 @@ pub fn scan(input: &[char]) -> Result<Vec<Lexeme>, Box<dyn std::error::Error>> {
 
             '(' => { i += 1; Lexeme::OpenParen  },
             ')' => { i += 1; Lexeme::CloseParen },
+            
+            w if w.is_whitespace() => { i += 1; continue; },
 
             n if n.is_numeric() => 
                     input[i..].iter()
@@ -36,7 +41,6 @@ pub fn scan(input: &[char]) -> Result<Vec<Lexeme>, Box<dyn std::error::Error>> {
                         .parse::<NumberType>()?
                         .into(),
             
-            w if w.is_whitespace() => { i += 1; continue; },
             
             other => Err(format!("unparsable char '{other}'"))?
         };
