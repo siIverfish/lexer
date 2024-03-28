@@ -1,6 +1,8 @@
 
+use crate::error::ScanError;
 use crate::token::{NumberType, Token};
 use crate::func::builtins::token::*;
+// use crate::input::Input;
 // use crate::error::ScanError;
 
 #[derive(Debug)]
@@ -20,30 +22,34 @@ pub fn scan(input: &[char]) -> Result<Vec<Lexeme>, Box<dyn std::error::Error>> {
     while let Some(&next_char) = input.get(i) {
         // considered factoring out `i += 1;` but it makes the
         // cool number bit so much cleaner :p
+        i += 1;
 
         let next_tk: Lexeme = match next_char {
-            '+' => { i += 1; Lexeme::Token(*ADDITION      )},
-            '-' => { i += 1; Lexeme::Token(*SUBTRACTION   )},
-            '*' => { i += 1; Lexeme::Token(*MULTIPLICATION)},
-            '/' => { i += 1; Lexeme::Token(*DIVISION      )},
-            '%' => { i += 1; Lexeme::Token(*MODULUS       )},
-
-            '(' => { i += 1; Lexeme::OpenParen  },
-            ')' => { i += 1; Lexeme::CloseParen },
-            
-            w if w.is_whitespace() => { i += 1; continue; },
-
-            n if n.is_numeric() => 
+            '+' => Ok(Lexeme::Token(*ADDITION      )),
+            '-' => Ok(Lexeme::Token(*SUBTRACTION   )),
+            '*' => Ok(Lexeme::Token(*MULTIPLICATION)),
+            '/' => Ok(Lexeme::Token(*DIVISION      )),
+            '%' => Ok(Lexeme::Token(*MODULUS       )),
+            '(' => Ok(Lexeme::OpenParen             ),
+            ')' => Ok(Lexeme::CloseParen            ),
+            w if w.is_whitespace() => continue,
+            other   => Err(ScanError::NoMatch(other))
+        }
+        .map(|lexeme| { i += 1; lexeme })
+        .or_else(|err| {
+            match err {
+                ScanError::NoMatch(c) if c.is_numeric() => {
                     input[i..].iter()
-                        .take_while(|&&c| c.is_numeric() || c == '.')
-                        .map(|x| { i += 1; x })
-                        .collect::<String>()
-                        .parse::<NumberType>()?
-                        .into(),
-            
-            
-            other => Err(format!("unparsable char '{other}'"))?
-        };
+                    .take_while(|&&c| c.is_numeric() || c == '.')
+                    .map(|x| { i += 1; x })
+                    .collect::<String>()
+                    .parse::<NumberType>()
+                    .map(NumberType::into)
+                    .map_err(ScanError::from)
+                },
+                other_err => Err(other_err)
+            }
+        })?;
 
         tokens.push(next_tk);
     }
