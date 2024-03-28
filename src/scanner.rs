@@ -20,11 +20,7 @@ pub fn scan(input: &[char]) -> Result<Vec<Lexeme>, Box<dyn std::error::Error>> {
     let mut tokens: Vec<Lexeme> = Vec::with_capacity(input.len() / 2);
 
     while let Some(&next_char) = input.get(i) {
-        // considered factoring out `i += 1;` but it makes the
-        // cool number bit so much cleaner :p
-        i += 1;
-
-        let next_tk: Lexeme = match next_char {
+        tokens.push(match next_char {
             '+' => Ok(Lexeme::Token(*ADDITION      )),
             '-' => Ok(Lexeme::Token(*SUBTRACTION   )),
             '*' => Ok(Lexeme::Token(*MULTIPLICATION)),
@@ -32,7 +28,7 @@ pub fn scan(input: &[char]) -> Result<Vec<Lexeme>, Box<dyn std::error::Error>> {
             '%' => Ok(Lexeme::Token(*MODULUS       )),
             '(' => Ok(Lexeme::OpenParen             ),
             ')' => Ok(Lexeme::CloseParen            ),
-            w if w.is_whitespace() => continue,
+            w if w.is_whitespace() => { i += 1; continue},
             other   => Err(ScanError::NoMatch(other))
         }
         .map(|lexeme| { i += 1; lexeme })
@@ -49,9 +45,7 @@ pub fn scan(input: &[char]) -> Result<Vec<Lexeme>, Box<dyn std::error::Error>> {
                 },
                 other_err => Err(other_err)
             }
-        })?;
-
-        tokens.push(next_tk);
+        })?);
     }
 
     Ok(tokens)
