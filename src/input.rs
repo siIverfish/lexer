@@ -21,7 +21,7 @@ impl Deref for Input {
     type Target = [InputUnit];
 
     fn deref(&self) -> &Self::Target {
-        &*self.data
+        &self.data
     }
 }
 

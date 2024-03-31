@@ -1,15 +1,25 @@
 
 
-pub type NumberType = f64;
+pub type ValueType = f64;
+pub type FuncType = &'static crate::func::LFunction;
 
-#[derive(Copy, Debug, Clone)]
+// I think this *should* be done with separate structs & dynamic dispatch.
+#[derive(Debug, Clone, PartialEq)]
 pub enum Token {
-    Number(NumberType),
-    Function(&'static crate::func::LFunction)
+    Ident(String),
+    Number(ValueType),
+    Function(FuncType),
+    Application { f: Box<Token>, args: Vec<Token> }
 }
 
-impl Into<Token> for NumberType {
-    fn into(self) -> Token {
-        Token::Number(self)
+impl From<ValueType> for Token {
+    fn from(value: ValueType) -> Token {
+        Token::Number(value)
+    }
+}
+
+impl From<String> for Token {
+    fn from(value: String) -> Token {
+        Token::Ident(value)
     }
 }
