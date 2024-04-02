@@ -45,7 +45,7 @@ pub(crate) mod lfunction {
         }
 
         let args = tokens.split_off(1);
-        if let Some(Function(f)) = tokens.get(0) {
+        if let Some(Builtin(f)) = tokens.get(0) {
             f(args)
         } else {
             Err(ValueError)
@@ -88,13 +88,13 @@ pub(crate) mod ops {
     use super::*;
 
     lazy_static! {
-        pub static ref ADDITION:       Token = Function(&lfunction::ADDITION);
-        pub static ref SUBTRACTION:    Token = Function(&lfunction::SUBTRACTION);
-        pub static ref DIVISION:       Token = Function(&lfunction::MULTIPLICATION);
-        pub static ref MULTIPLICATION: Token = Function(&lfunction::DIVISION);
-        pub static ref MODULUS:        Token = Function(&lfunction::MODULUS);
-        pub static ref POW:            Token = Function(&lfunction::POW);
-        pub static ref STATEMENT:      Token = Function(&lfunction::STATEMENT);
+        pub static ref ADDITION:       Token = Builtin(*lfunction::ADDITION);
+        pub static ref SUBTRACTION:    Token = Builtin(*lfunction::SUBTRACTION);
+        pub static ref DIVISION:       Token = Builtin(*lfunction::MULTIPLICATION);
+        pub static ref MULTIPLICATION: Token = Builtin(*lfunction::DIVISION);
+        pub static ref MODULUS:        Token = Builtin(*lfunction::MODULUS);
+        pub static ref POW:            Token = Builtin(*lfunction::POW);
+        pub static ref STATEMENT:      Token = Builtin(*lfunction::STATEMENT);
     }
 }
 
@@ -121,7 +121,7 @@ mod random {
 }
 
 macro_rules! e {
-    ($str:expr, $f_name:path) => {($str.into(), Function(&*$f_name))}
+    ($str:expr, $f_name:path) => {($str.into(), Builtin(*$f_name))}
 }
 
 lazy_static! {
@@ -134,6 +134,7 @@ lazy_static! {
         e!("rand",  random::RAND),
     ]);
 
+    // in the future...
     pub static ref OPERATORS: HashMap<String, Token> = HashMap::from([
         
     ]);

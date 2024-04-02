@@ -63,6 +63,8 @@ impl<'input> Scanner<'input> {
                 &[';', ..]      => Ok((1, Token(STATEMENT.clone()))),
                 &['(', ..]      => Ok((1, OpenParen)),
                 &[')', ..]      => Ok((1, CloseParen)),
+                &['{', ..]      => Ok((1, OpenScope)),
+                &['}', ..]      => Ok((1, CloseScope)),
                 &[',', ..]      => Ok((1, Comma)),
                 &['=', ..]      => Ok((1, Keyword(ToEqual))),
                 &['#', ..]      => {

@@ -20,8 +20,11 @@ pub enum Token {
     Declaration { name: Box<Token>, value: Box<Token> },
     Set { name: Box<Token>, value: Box<Token> },
 
-    Function(&'static LFunction),
+    Block(Box<Token>),
+    Function { args: Vec<Token>,  expr: Box<Token> },
+    Builtin(LFunction),
     Application { f: Box<Token>, args: Vec<Token> },
+    // Block(Vec<Token>),
 }
 
 use Data::*;

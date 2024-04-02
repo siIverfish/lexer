@@ -5,7 +5,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     use lcalc3::scanner::Scanner;
     let output = Scanner::with_input(&input).scan_input()?;
-    // println!("{output:#?}");
+    println!("{output:#?}");
 
     use lcalc3::parser::Parser;
     let output = Parser::parse_lexemes(output)?;

@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::cell::{Ref, RefCell};
 use std::collections::HashMap;
 
 use crate::token::{Token, Token::*, Data::*};
@@ -9,8 +9,8 @@ use crate::error::EvalError::*;
 pub type EvalResult = Result<Token, EvalError>;
 
 pub struct Scope<'parent> {
-    vars: HashMap<String, Token>,
-    parent: Option<&'parent RefCell<Scope<'parent>>>,
+    vars: RefCell<HashMap<String, Token>>,
+    parent: Option<&'parent Scope<'parent>>,
 }
 
 impl<'parent> Scope<'parent> {
@@ -18,33 +18,33 @@ impl<'parent> Scope<'parent> {
         // duplication of the BUILTINS map --
         // could this be avoided?
         Scope {
-            vars: crate::builtins::BUILTINS.clone(),
+            vars: RefCell::new(crate::builtins::BUILTINS.clone()),
             parent: None,
         }
     }
 
-    pub fn with_parent(parent: &'parent RefCell<Scope<'parent>>) -> Self {
-        let vars = HashMap::new();
+    pub fn with_parent(parent: &'parent Scope<'parent>) -> Self {
+        let vars = RefCell::new(HashMap::new());
         let parent = Some(parent);
 
         Scope { vars, parent }
     }
 
-    pub fn get(&mut self, name: &str) -> Option<Token> {
-        self.vars.get(name)
+    pub fn get(&self, name: &str) -> Option<Token> {
+        self.vars.borrow()
+            .get(name)
             .map(Token::clone)
-            .or_else(|| self.parent.and_then(
-                |parent_cell| (&mut parent_cell.borrow_mut()).get(name)
-            )
+            .or_else(
+                || self.parent.and_then(|parent| parent.get(name))
             )
     }
 
-    pub fn create(&mut self, name: Token, value: Token) -> Result<(), EvalError> {
+    pub fn create(&self, name: Token, value: Token) -> Result<(), EvalError> {
         if let Ident(name) = name {
-            if self.vars.contains_key(&name) {
+            if self.vars.borrow().contains_key(&name) {
                 Err(RedefinedVariable(name))
             } else {
-                self.vars.insert(name, value);
+                self.vars.borrow_mut().insert(name, value);
                 Ok(())
             }
         } else {
@@ -52,20 +52,19 @@ impl<'parent> Scope<'parent> {
         }
     }
 
-    pub fn set_ident(&mut self, name: String, value: Token) -> Result<(), EvalError> {
-        if self.vars.contains_key(&name) {
-            self.vars.insert(name, value);
+    pub fn set_ident(&self, name: String, value: Token) -> Result<(), EvalError> {
+        if self.vars.borrow().contains_key(&name) {
+            self.vars.borrow_mut().insert(name, value);
             Ok(())
         } else {
             // delegate to parent scope if we don't own the value
-            let mut parent_cell = self.parent
-                .ok_or(UndefinedVariable(name.clone()))?
-                .borrow_mut();
-            (&mut parent_cell).set_ident(name, value)
+            self.parent
+                .ok_or(UndefinedVariable(name.clone()))
+                .and_then(|parent| parent.set_ident(name, value))
         }
     }
 
-    pub fn set(&mut self, token: Token, value: Token) -> Result<(), EvalError> {
+    pub fn set(&self, token: Token, value: Token) -> Result<(), EvalError> {
         // if this scope owns the key, set it here
         if let Ident(name) = token {
             self.set_ident(name, value)
@@ -74,7 +73,7 @@ impl<'parent> Scope<'parent> {
         }
     }
 
-    pub fn eval(&mut self, token: Token) -> EvalResult {
+    pub fn eval(&self, token: Token) -> EvalResult {
         match token {
             Application { f, args } =>
                 args.into_iter()
@@ -82,7 +81,7 @@ impl<'parent> Scope<'parent> {
                     .try_collect()
                     .and_then(|args| {
                         match self.eval(*f)? {
-                            Token::Function(function) => function(args),
+                            Token::Builtin(function) => function(args),
                             other => Err(NotAFunction(other))
                         }
                     }),
@@ -95,6 +94,7 @@ impl<'parent> Scope<'parent> {
                 let value = self.eval(*value)?;
                 self.set(*name, value).map(|()| Value(Void))
             }
+            Block(expr) => Scope::with_parent(&self).eval(*expr),
             other => Ok(other), // bad
         }
     }

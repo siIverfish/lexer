@@ -9,6 +9,7 @@ pub enum Keyword {
     Loop,
     Print,
     ToEqual,
+    Lambda,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -18,6 +19,8 @@ pub enum Lexeme {
     OpenParen,
     Comma,
     CloseParen,
+    OpenScope,
+    CloseScope,
 }
 
 impl From<Token> for Lexeme {
@@ -53,6 +56,7 @@ impl Lexeme {
             "while" => While,
             "loop" => Loop,
             "print" => Print,
+            "lambda" => Lambda,
             _ => None?,
         }).map(Lexeme::from)
     }

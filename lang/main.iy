@@ -1,1 +1,7 @@
-print "Hello, World!";
+{
+    print 1
+};
+print {
+    var a = 4;
+    a
+}

@@ -3,7 +3,6 @@ use crate::error::{ParseError, ParseError::*};
 use crate::func::LFunction;
 use crate::lexeme::{Keyword::*, Lexeme, Lexeme::*};
 use crate::token::{Token, Token::*};
-use crate::token::Token::Application;
 
 type ParseResult = Result<Token, ParseError>;
 
@@ -45,12 +44,12 @@ impl Parser {
         let mut left: Token = next(self)?;
 
         loop {
-            if let Ok(Token(Function(f))) = self.peek() {
-                if ops.contains(&f) {
+            if let Ok(Token(Builtin(f))) = self.peek() {
+                if ops.contains(&&f) {
                     self.advance();
                     let right = next(self)?;
                     let args = vec![left, right];
-                    left = Application { f: Box::new(Function(f)), args };
+                    left = Application { f: Box::new(Builtin(f)), args };
                     continue;
                 }
             }
@@ -73,20 +72,22 @@ impl Parser {
     }
 
     pub fn parse_statements(&mut self) -> ParseResult {
-        let mut left: Token = self.parse_keyword_statement()?;
+        let left: Token = self.parse_keyword_statement()?;
+        let mut args = vec![left];
 
         loop {
-            if let Ok(Lexeme::Token(Token::Function(f))) = self.peek() {
-                if *f == *STATEMENT {
+            if let Ok(Lexeme::Token(Token::Builtin(f))) = self.peek() {
+                if f == *STATEMENT { 
                     self.advance();
                     if let Ok(right) = self.parse_keyword_statement() {
-                        let args = vec![left, right];
-                        left = Token::Application { f: Box::new(Token::Function(f)), args };
+                        args.push(right);
                         continue;
                     }
                 }
             }
-            break Ok(left);
+            break Ok(Block(Box::new(
+                Application { f: Box::new(Builtin(*STATEMENT)), args }
+            )));
         }
     }
 
@@ -96,7 +97,7 @@ impl Parser {
             match keyword {
                 // eventually refactor out
                 Print => {
-                    let f = Box::new(Token::Function(&PRINT));
+                    let f = Box::new(Token::Builtin(*PRINT));
                     let args = vec![self.parse_expression()?];
                     Ok(Application { f, args })
                 }
@@ -173,6 +174,7 @@ impl Parser {
         match current_lexeme {
             Lexeme::Token(token) => Ok(token),
             Lexeme::OpenParen => self.parse_group(),
+            Lexeme::OpenScope => self.parse_block(),
             unexpected => Err(UnexpectedLexeme(unexpected))
         }
     }
@@ -182,6 +184,13 @@ impl Parser {
         // self.consume(Lexeme::OpenParen)?;
         let ret = self.parse_expression();
         self.consume(Lexeme::CloseParen)?;
+        ret
+    }
+
+    pub fn parse_block(&mut self) -> ParseResult {
+        // Lexeme::OpenScope already consumed.
+        let ret = self.parse_statements();
+        self.consume(Lexeme::CloseScope)?;
         ret
     }
 }
