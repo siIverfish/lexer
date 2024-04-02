@@ -1,11 +1,11 @@
-
 use lazy_static::lazy_static;
-use crate::token::Token;
 use crate::func::LFunction;
 use crate::error::EvalError::*;
 use crate::eval::EvalResult;
 use std::collections::HashMap;
 use std::ops::*;
+
+use crate::token::{Token, Token::*, Data::*};
 
 pub(crate) mod lfunction {
     use super::*;
@@ -16,7 +16,7 @@ pub(crate) mod lfunction {
                 tokens.into_iter()
                     .try_reduce(|a, b| 
                         match (a, b) {
-                            (Token::Number(a), Token::Number(b)) => Ok(Token::Number($op(a,b))),
+                            (Value($variant(a)), Value($variant(b))) => Ok(Value(F64($op(a,b)))),
                             _ => Err(ValueError)
                         }
                     )
@@ -30,8 +30,8 @@ pub(crate) mod lfunction {
             LFunction(&|tokens| {
                 let mut iter = tokens.into_iter();
 
-                if let Some(Token::Number(n)) = iter.next().filter(|_| iter.next().is_none()) {
-                    Ok(Token::Number($op(n)))
+                if let Some(Value(F64(n))) = iter.next().filter(|_| iter.next().is_none()) {
+                    Ok(Value(F64($op(n))))
                 } else {
                     Err(ArgumentError)
                 }
@@ -45,40 +45,56 @@ pub(crate) mod lfunction {
         }
 
         let args = tokens.split_off(1);
-        if let Some(Token::Function(f)) = tokens.get(0) {
+        if let Some(Function(f)) = tokens.get(0) {
             f(args)
         } else {
             Err(ValueError)
         }
     }
 
+    pub fn statement(tokens: Vec<Token>) -> EvalResult {
+        tokens.into_iter().last().ok_or(ArgumentError)
+    }
+
+    pub fn print(tokens: Vec<Token>) -> EvalResult {
+        for token in tokens {
+            println!("{token}");
+        }
+        Ok(Value(Void))
+    }
+
     lazy_static! {
-        pub static ref ADDITION:       LFunction = binary_reduction_operator_for!(Number, f64::add);
-        pub static ref SUBTRACTION:    LFunction = binary_reduction_operator_for!(Number, f64::sub);
-        pub static ref DIVISION:       LFunction = binary_reduction_operator_for!(Number, f64::mul);
-        pub static ref MULTIPLICATION: LFunction = binary_reduction_operator_for!(Number, f64::div);
-        pub static ref MODULUS:        LFunction = binary_reduction_operator_for!(Number, f64::rem);
+        pub static ref ADDITION:       LFunction = binary_reduction_operator_for!(F64, f64::add);
+        pub static ref SUBTRACTION:    LFunction = binary_reduction_operator_for!(F64, f64::sub);
+        pub static ref DIVISION:       LFunction = binary_reduction_operator_for!(F64, f64::mul);
+        pub static ref MULTIPLICATION: LFunction = binary_reduction_operator_for!(F64, f64::div);
+        pub static ref MODULUS:        LFunction = binary_reduction_operator_for!(F64, f64::rem);
+        pub static ref POW:            LFunction = binary_reduction_operator_for!(F64, f64::powf);
 
-        pub static ref  SIN: LFunction = unary_operator_for!(Number, f64::sin);
-        pub static ref  COS: LFunction = unary_operator_for!(Number, f64::cos);
-        pub static ref  TAN: LFunction = unary_operator_for!(Number, f64::tan);
-        pub static ref ASIN: LFunction = unary_operator_for!(Number, f64::asin);
-        pub static ref ACOS: LFunction = unary_operator_for!(Number, f64::acos);
-        pub static ref ATAN: LFunction = unary_operator_for!(Number, f64::atan);
+        pub static ref  SIN: LFunction = unary_operator_for!(F64, f64::sin);
+        pub static ref  COS: LFunction = unary_operator_for!(F64, f64::cos);
+        pub static ref  TAN: LFunction = unary_operator_for!(F64, f64::tan);
+        pub static ref ASIN: LFunction = unary_operator_for!(F64, f64::asin);
+        pub static ref ACOS: LFunction = unary_operator_for!(F64, f64::acos);
+        pub static ref ATAN: LFunction = unary_operator_for!(F64, f64::atan);
 
+        pub static ref STATEMENT: LFunction = LFunction(&statement);
         pub static ref APPLICATION: LFunction = LFunction(&application);
-    }      
-}      
+        pub static ref PRINT: LFunction = LFunction(&print);
+    }
+}
 
-pub(crate) mod token { 
+pub(crate) mod ops {
     use super::*;
 
     lazy_static! {
-        pub static ref ADDITION:       Token = Token::Function(&lfunction::ADDITION);
-        pub static ref SUBTRACTION:    Token = Token::Function(&lfunction::SUBTRACTION);
-        pub static ref DIVISION:       Token = Token::Function(&lfunction::MULTIPLICATION);
-        pub static ref MULTIPLICATION: Token = Token::Function(&lfunction::DIVISION);
-        pub static ref MODULUS:        Token = Token::Function(&lfunction::MODULUS);
+        pub static ref ADDITION:       Token = Function(&lfunction::ADDITION);
+        pub static ref SUBTRACTION:    Token = Function(&lfunction::SUBTRACTION);
+        pub static ref DIVISION:       Token = Function(&lfunction::MULTIPLICATION);
+        pub static ref MULTIPLICATION: Token = Function(&lfunction::DIVISION);
+        pub static ref MODULUS:        Token = Function(&lfunction::MODULUS);
+        pub static ref POW:            Token = Function(&lfunction::POW);
+        pub static ref STATEMENT:      Token = Function(&lfunction::STATEMENT);
     }
 }
 
@@ -105,15 +121,20 @@ mod random {
 }
 
 macro_rules! e {
-    ($str:expr, $f_name:path) => {($str.into(), Token::Function(&*$f_name))}
+    ($str:expr, $f_name:path) => {($str.into(), Function(&*$f_name))}
 }
 
 lazy_static! {
     pub static ref BUILTINS: HashMap<String, Token> = HashMap::from([
-        e!("add",  lfunction::ADDITION),
-        e!("sin",  lfunction::SIN),
-        e!("cos",  lfunction::COS),
-        e!("tan",  lfunction::TAN),
-        e!("rand", random::RAND)
+        e!("add",   lfunction::ADDITION),
+        e!("sin",   lfunction::SIN),
+        e!("cos",   lfunction::COS),
+        e!("tan",   lfunction::TAN),
+        e!("print", lfunction::PRINT),
+        e!("rand",  random::RAND),
+    ]);
+
+    pub static ref OPERATORS: HashMap<String, Token> = HashMap::from([
+        
     ]);
 }  

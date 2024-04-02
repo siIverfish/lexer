@@ -1,19 +1,21 @@
-
-use crate::lexeme::Lexeme;
-use crate::token::Token;
-use crate::error::{ParseError, ParseError::*};
 use crate::builtins::lfunction::*;
+use crate::error::{ParseError, ParseError::*};
+use crate::func::LFunction;
+use crate::lexeme::{Keyword::*, Lexeme, Lexeme::*};
+use crate::token::{Token, Token::*};
+use crate::token::Token::Application;
 
 type ParseResult = Result<Token, ParseError>;
 
+#[derive(Debug)]
 pub struct Parser {
     index: usize,
     lexemes: Vec<Lexeme>,
 }
 
 impl Parser {
-    pub fn parse(lexemes: Vec<Lexeme>) -> ParseResult {
-        dbg!(Parser::new(lexemes).parse_expression())
+    pub fn parse_lexemes(lexemes: Vec<Lexeme>) -> ParseResult {
+        Parser::new(lexemes).parse()
     }
 
     pub fn new(lexemes: Vec<Lexeme>) -> Self {
@@ -29,9 +31,7 @@ impl Parser {
     }
 
     pub fn peek(&mut self) -> Result<Lexeme, ParseError> {
-        self.lexemes.get(self.index)
-            .map(Lexeme::clone)
-            .ok_or(OutOfInputError)
+        self.lexemes.get(self.index).map(Lexeme::clone).ok_or(OutOfInputError)
     }
 
     pub fn consume(&mut self, expected: Lexeme) -> Result<(), ParseError> {
@@ -41,49 +41,107 @@ impl Parser {
         }
     }
 
+    pub fn parse_binary_ops(&mut self, ops: &[&LFunction], next: impl Fn(&mut Self) -> ParseResult) -> ParseResult {
+        let mut left: Token = next(self)?;
+
+        loop {
+            if let Ok(Token(Function(f))) = self.peek() {
+                if ops.contains(&f) {
+                    self.advance();
+                    let right = next(self)?;
+                    let args = vec![left, right];
+                    left = Application { f: Box::new(Function(f)), args };
+                    continue;
+                }
+            }
+            break Ok(left);
+        }
+    }
+}
+
+impl Parser {
+    pub fn parse(&mut self) -> ParseResult {
+        self.parse_program()
+    }
+
+    pub fn parse_program(&mut self) -> ParseResult {
+        let ret = self.parse_statements();
+        match self.next() {
+            Err(OutOfInputError) => ret,
+            _ => {dbg!(&self.lexemes[self.index..]);Err(UnusedInput)},
+        }
+    }
+
+    pub fn parse_statements(&mut self) -> ParseResult {
+        let mut left: Token = self.parse_keyword_statement()?;
+
+        loop {
+            if let Ok(Lexeme::Token(Token::Function(f))) = self.peek() {
+                if *f == *STATEMENT {
+                    self.advance();
+                    if let Ok(right) = self.parse_keyword_statement() {
+                        let args = vec![left, right];
+                        left = Token::Application { f: Box::new(Token::Function(f)), args };
+                        continue;
+                    }
+                }
+            }
+            break Ok(left);
+        }
+    }
+
+    pub fn parse_keyword_statement(&mut self) -> ParseResult {
+        if let Keyword(keyword) = self.peek()? {
+            self.advance();
+            match keyword {
+                // eventually refactor out
+                Print => {
+                    let f = Box::new(Token::Function(&PRINT));
+                    let args = vec![self.parse_expression()?];
+                    Ok(Application { f, args })
+                }
+                DefineVar => {
+                    let Token(Ident(name)) = self.next()? else { return Err(MalformedStatement(DefineVar)); };
+                    self.consume(Keyword(ToEqual))?;
+                    let value = self.parse_expression()?.into();
+                    let name = Ident(name).into();
+                    Ok(Declaration { name, value })
+                }
+                _ => unimplemented!(),
+            }
+        } else {
+            let expr = self.parse_expression()?;
+            if let Ok(Keyword(ToEqual)) = self.peek() {
+                self.advance();
+                let name = expr.into();
+                let value = self.parse_expression()?.into();
+                Ok(Set { name, value })
+            } else {
+                Ok(expr)
+            }
+        }
+    }
+
     pub fn parse_expression(&mut self) -> ParseResult {
         self.parse_add_sub()
     }
 
     pub fn parse_add_sub(&mut self) -> ParseResult {
-        let mut left: Token = self.parse_mul_div_mod()?;
-
-        while let Ok(Lexeme::Token(Token::Function(f))) = self.peek() {
-            if *f == *ADDITION || *f == *SUBTRACTION {
-                self.advance();
-                let right = self.parse_mul_div_mod()?;
-                let args = vec![left, right];
-                left = Token::Application { f: Box::new(Token::Function(f)), args };
-                continue;
-            }
-            break;
-        }
-
-        Ok(left)
+        self.parse_binary_ops(&[&ADDITION, &SUBTRACTION], Self::parse_mul_div_mod)
     }
 
     pub fn parse_mul_div_mod(&mut self) -> ParseResult {
-        let mut left: Token = self.parse_application()?;
+        self.parse_binary_ops(&[&MULTIPLICATION, &DIVISION, &MODULUS], Self::parse_pow)
+    }
 
-        while let Ok(Lexeme::Token(Token::Function(f))) = self.peek() {
-            if *f == *MULTIPLICATION || *f == *DIVISION || *f == *MODULUS {
-                self.advance();
-                let right = self.parse_mul_div_mod()?;
-                let args = vec![left, right];
-                left = Token::Application { f: Box::new(Token::Function(f)), args };
-                continue;
-            }
-            break;
-        }
-
-        Ok(left)
+    pub fn parse_pow(&mut self) -> ParseResult {
+        self.parse_binary_ops(&[&POW], Self::parse_application)
     }
 
     pub fn parse_application(&mut self) -> ParseResult {
         let mut f = self.parse_literal()?;
 
         while let Ok(Lexeme::OpenParen) = self.peek() {
-            println!("PARSING THE LIST");
             self.advance();
             let args = self.parse_list()?;
             self.consume(Lexeme::CloseParen)?;
@@ -111,8 +169,7 @@ impl Parser {
 
     pub fn parse_literal(&mut self) -> ParseResult {
         let current_lexeme = self.next()?;
-        dbg!(&current_lexeme);
-    
+
         match current_lexeme {
             Lexeme::Token(token) => Ok(token),
             Lexeme::OpenParen => self.parse_group(),

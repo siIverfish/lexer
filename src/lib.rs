@@ -3,8 +3,8 @@
 
 
 pub(crate) mod spec {
-    pub fn is_valid_identifier(c: char) -> bool {
-        c.is_ascii_alphanumeric() || c == '!' || c == '?' || c == '~'
+    pub const fn is_valid_identifier(c: char) -> bool {
+        c.is_ascii_alphanumeric() || c == '!' || c == '?' || c == '~' || c == '_'
     }
 
     // static is_valid_identifier: &(dyn Sync + Fn(char) -> bool) = 

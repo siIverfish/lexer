@@ -1,4 +1,3 @@
-
 // use crate::token::ValueType;
 use crate::token::Token;
 use crate::eval::EvalResult;
@@ -15,7 +14,7 @@ impl PartialEq for LFunction {
     }
 }
 
-impl std::fmt::Debug for LFunction  {
+impl std::fmt::Debug for LFunction {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "LFunction( <?> )")
     }
@@ -26,6 +25,8 @@ impl Clone for LFunction {
         Self(self.0)
     }
 }
+
+impl Copy for LFunction {}
 
 impl Deref for LFunction {
     type Target = FunctionType;
@@ -41,7 +42,7 @@ use std::ops::*;
 //     ($trait:ident, $fname:ident) => {
 //         impl $trait for Token {
 //             type Output = EvalResult;
-        
+
 //             fn $fname(self, rhs: Self) -> Self::Output {
 //                 match (self, rhs) {
 //                     (Token::Number(a), Token::Number(b)) => Ok(Token::Number(a.$fname(b))),
@@ -52,5 +53,4 @@ use std::ops::*;
 //     }
 // }
 
-pub(crate) mod builtins {
-}
+pub(crate) mod builtins {}
