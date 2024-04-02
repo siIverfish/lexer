@@ -1,0 +1,7 @@
+var a = 3;
+print a;
+print 7 * 4;
+var randomly_generated = rand();
+print randomly_generated;
+randomly_generated = 4;
+print randomly_generated;
